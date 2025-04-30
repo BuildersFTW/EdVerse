@@ -1,5 +1,5 @@
 // API service for interacting with the backend
-const API_BASE_URL = 'http://localhost:8000';
+const API_BASE_URL = 'http://54.204.190.218';
 
 // Fetch educational subtopics based on a concept
 export const fetchSubtopics = async (concept) => {
