@@ -1,5 +1,5 @@
 // API service for interacting with the backend
-const API_BASE_URL = 'http://54.204.190.218';
+const API_BASE_URL = 'https://https://edverse-server.ralgo.org';
 
 // Fetch educational subtopics based on a concept
 export const fetchSubtopics = async (concept) => {
