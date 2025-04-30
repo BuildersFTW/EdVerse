@@ -1,11 +1,11 @@
 // API service for interacting with the backend
-const API_BASE_URL = 'localhost:8000';
+const API_BASE_URL = 'edverse-server.ralgo.org';
 
 // Fetch educational subtopics based on a concept
 export const fetchSubtopics = async (concept) => {
   try {
     console.log(`Fetching subtopics for: ${concept}`);
-    const response = await fetch(`http://${API_BASE_URL}/subtopics?concept=${encodeURIComponent(concept)}`, {
+    const response = await fetch(`https://${API_BASE_URL}/subtopics?concept=${encodeURIComponent(concept)}`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -60,7 +60,7 @@ export const generateScript = async (conceptSubtopic, fandom) => {
       fandom: fandom
     });
     
-    const response = await fetch(`http://${API_BASE_URL}/script`, {
+    const response = await fetch(`https://${API_BASE_URL}/script`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -91,7 +91,7 @@ export const generateScript = async (conceptSubtopic, fandom) => {
 // Generate voiceover for a script
 export const generateVoiceover = async (script) => {
   try {
-    const response = await fetch(`http://${API_BASE_URL}/generate_voiceover`, {
+    const response = await fetch(`https://${API_BASE_URL}/generate_voiceover`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -155,6 +155,6 @@ export const generateVideo = async (voiceoverData) => {
 export const getVideoUrl = (filename) => {
   if (!filename) return null;
   // Add cache busting parameter to prevent caching issues
-  return `http://${API_BASE_URL}/download_video/${filename}?t=${Date.now()}`;
+  return `https://${API_BASE_URL}/download_video/${filename}?t=${Date.now()}`;
 };
 
