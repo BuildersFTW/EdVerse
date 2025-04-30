@@ -1,6 +1,8 @@
 import os
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from fastapi.routing import APIRoute
 
 # Import functionality from modules
 from utils import validate_api_keys
@@ -12,21 +14,37 @@ from video import VideoRequest, generate_video, download_video
 # Initialize FastAPI app
 app = FastAPI(title="Educational Subtopics API")
 
-# Add CORS middleware specifically for React frontend
+# Allow only the specified origin
+origins = [
+    "https://edverse-mu.vercel.app"
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",  # React dev server
-        "http://127.0.0.1:3000",  # Alternative localhost
-        "http://localhost:5173",  # Vite dev server (if used)
-        "http://127.0.0.1:5173",  # Alternative for Vite
-        "*",  # Allow all origins temporarily for debugging
-    ],
+    allow_origins=origins,  # specific allowed origin
     allow_credentials=True,
-    allow_methods=["*"],  # Allow all methods
-    allow_headers=["*"],  # Allow all headers
-    expose_headers=["*"],  # Expose all headers in response
+    allow_methods=["GET", "POST", "OPTIONS"],  # Explicitly include OPTIONS for preflight
+    allow_headers=["Content-Type", "Authorization", "X-Requested-With"],
 )
+
+# Add custom middleware to ensure CORS headers are included in error responses
+@app.middleware("http")
+async def add_cors_headers(request, call_next):
+    try:
+        response = await call_next(request)
+        return response
+    except Exception as exc:
+        # Ensure CORS headers are included even in exception responses
+        return JSONResponse(
+            status_code=500,
+            content={"detail": str(exc)},
+            headers={
+                "Access-Control-Allow-Origin": "https://edverse-mu.vercel.app",
+                "Access-Control-Allow-Credentials": "true",
+                "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+                "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With",
+            }
+        )
 
 # Validate API keys on startup
 try:
