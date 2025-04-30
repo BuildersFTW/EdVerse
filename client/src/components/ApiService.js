@@ -5,6 +5,7 @@ const API_BASE_URL = 'edverse-server.ralgo.org';
 export const fetchSubtopics = async (concept) => {
   try {
     console.log(`Fetching subtopics for: ${concept}`);
+    console.log(`API_BASE_URL: ${API_BASE_URL}`);
     const response = await fetch(`${API_BASE_URL}/subtopics?concept=${encodeURIComponent(concept)}`, {
       method: 'GET',
       headers: {
