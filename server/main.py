@@ -54,9 +54,6 @@ async def voiceover_endpoint(request: VoiceoverRequest):
 async def video_endpoint(request: VideoRequest):
     return await generate_video(request)
 
-@app.get("/download_audio/{filename}")
-async def download_audio_endpoint(filename: str):
-    return await download_audio(filename)
 
 @app.get("/download_video/{filename}")
 async def download_video_endpoint(filename: str):
