@@ -1,7 +1,8 @@
 import os
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from starlette.middleware.base import BaseHTTPMiddleware
 
 
 
@@ -15,38 +16,32 @@ from video import VideoRequest, generate_video, download_video
 # Initialize FastAPI app
 app = FastAPI(title="Educational Subtopics API")
 
-# Allow specified origins
-origins = [
-    "https://edverse-mu.vercel.app",
-    "https://edverse-server.ralgo.org"
-]
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,  # Use the specified origins list
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# Add custom middleware to ensure CORS headers are included in error responses
-@app.middleware("http")
-async def add_cors_headers(request, call_next):
-    try:
+# Define a custom middleware to ensure CORS headers are present on every response
+class CORSHeaderMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        # Process the request and get the response
         response = await call_next(request)
+        
+        # Add CORS headers to every response
+        response.headers["Access-Control-Allow-Origin"] = "https://edverse-mu.vercel.app"
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Requested-With"
+        
         return response
-    except Exception as exc:
-        # Ensure CORS headers are included even in exception responses
-        return JSONResponse(
-            status_code=500,
-            content={"detail": str(exc)},
-            headers={
-                "Access-Control-Allow-Origin": "https://edverse-mu.vercel.app",
-                "Access-Control-Allow-Credentials": "true",
-                "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-                "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With",
-            }
-        )
+
+# Add our custom CORS middleware first
+app.add_middleware(CORSHeaderMiddleware)
+
+# Handle OPTIONS requests (preflight requests)
+@app.options("/{full_path:path}")
+async def options_handler(request: Request, full_path: str):
+    response = Response()
+    response.headers["Access-Control-Allow-Origin"] = "https://edverse-mu.vercel.app"
+    response.headers["Access-Control-Allow-Credentials"] = "true"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Requested-With"
+    return response
 
 # Validate API keys on startup
 try:
@@ -75,16 +70,17 @@ async def video_endpoint(request: VideoRequest):
     try:
         response = await generate_video(request)
         
-        # Return a consistent JSONResponse for all cases
-        if isinstance(response, dict):
-            return JSONResponse(content=response)
-        
-        # For non-dictionary responses, convert to a standard format
-        return JSONResponse(content={"result": "success", "data": str(response)})
-    
+        # Convert any response to a JSONResponse
+        if not isinstance(response, dict):
+            response = {"result": "success", "data": str(response)}
+            
+        return JSONResponse(content=response)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
+        print(f"Error in generate_video: {str(e)}")
+        return JSONResponse(
+            status_code=500,
+            content={"error": str(e)}
+        )
 
 @app.get("/download_video/{filename}")
 async def download_video_endpoint(filename: str):
@@ -96,7 +92,18 @@ async def download_video_endpoint(filename: str):
         return response
     except Exception as e:
         print(f"Error streaming video file {filename}: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error streaming video: {str(e)}")
+        return JSONResponse(
+            status_code=500,
+            content={"error": f"Error streaming video: {str(e)}"}
+        )
+
+# Handle all exceptions globally
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    return JSONResponse(
+        status_code=500,
+        content={"detail": str(exc)},
+    )
 
 if __name__ == "__main__":
     import uvicorn
