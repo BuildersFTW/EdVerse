@@ -130,8 +130,7 @@ export const generateVideo = async (voiceoverData) => {
       },
       body: JSON.stringify({
         voiceover_data: voiceoverData
-      }),
-      mode: 'cors'  // Explicitly set CORS mode
+      }) 
     });
     
     if (!response.ok) {
