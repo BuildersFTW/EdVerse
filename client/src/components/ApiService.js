@@ -98,7 +98,9 @@ export const generateVoiceover = async (script) => {
       },
       body: JSON.stringify({
         script: script
-      })
+      }),
+      credentials: 'omit', // Don't send credentials
+      mode: 'cors' // Explicitly set CORS mode
     });
     
     if (!response.ok) {
@@ -121,7 +123,7 @@ export const generateVideo = async (voiceoverData) => {
       timestamps_count: voiceoverData.timestamps?.length
     });
 
-    // Ensure we're strictly following the same pattern as the working voiceover function
+    // Try using a different approach for the fetch request
     const response = await fetch(`https://${API_BASE_URL}/generate_video`, {
       method: 'POST',
       headers: {
@@ -130,7 +132,9 @@ export const generateVideo = async (voiceoverData) => {
       },
       body: JSON.stringify({
         voiceover_data: voiceoverData
-      }) 
+      }),
+      credentials: 'omit', // Don't send credentials
+      mode: 'cors' // Explicitly set CORS mode
     });
     
     if (!response.ok) {
