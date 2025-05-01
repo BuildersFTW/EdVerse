@@ -893,8 +893,6 @@ function App() {
           </section>
         )}
 
-        {/* Examples only shown initially */}
-        {showExamples && step === 1 && <ExampleSkits />}
       </main>
 
       <footer>
