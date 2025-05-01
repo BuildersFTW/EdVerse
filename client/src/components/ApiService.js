@@ -130,7 +130,8 @@ export const generateVideo = async (voiceoverData) => {
       },
       body: JSON.stringify({
         voiceover_data: voiceoverData
-      })
+      }),
+      mode: 'cors'  // Explicitly set CORS mode
     });
     
     if (!response.ok) {
@@ -149,6 +150,7 @@ export const generateVideo = async (voiceoverData) => {
     return data;
   } catch (error) {
     console.error('ApiService: Error generating video:', error);
+
     // Provide more detailed error information for debugging
     if (error.message && error.message.includes('Failed to fetch')) {
       console.error('ApiService: This may be a CORS error. Check the server CORS configuration and network tab.');
@@ -179,6 +181,7 @@ export const downloadVideo = async (filename) => {
     return URL.createObjectURL(blob);
   } catch (error) {
     console.error('ApiService: Error downloading video:', error);
+
     throw error;
   }
 };
