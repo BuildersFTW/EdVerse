@@ -115,53 +115,52 @@ export const generateVoiceover = async (script) => {
 };
 
 // Generate video from voiceover data
-export const generateVideo = generateVideoXHR;
-// export const generateVideo = async (voiceoverData) => {
-//   try {
-//     console.log('ApiService: Generating video with voiceover data:', {
-//       dataKeys: Object.keys(voiceoverData),
-//       hasTimestamps: !!voiceoverData.timestamps,
-//       timestamps_count: voiceoverData.timestamps?.length
-//     });
+export const generateVideo = async (voiceoverData) => {
+  try {
+    console.log('ApiService: Generating video with voiceover data:', {
+      dataKeys: Object.keys(voiceoverData),
+      hasTimestamps: !!voiceoverData.timestamps,
+      timestamps_count: voiceoverData.timestamps?.length
+    });
 
-//     // Try using a different approach for the fetch request
-//     const response = await fetch(`https://${API_BASE_URL}/generate_video`, {
-//       method: 'POST',
-//       headers: {
-//         'Content-Type': 'application/json',
-//         'Accept': 'application/json'
-//       },
-//       body: JSON.stringify({
-//         voiceover_data: voiceoverData
-//       }),
-//       credentials: 'omit', // Don't send credentials
-//       mode: 'cors' // Explicitly set CORS mode
-//     });
+    // Try using a different approach for the fetch request
+    const response = await fetch(`https://${API_BASE_URL}/generate_video`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify({
+        voiceover_data: voiceoverData
+      }),
+      credentials: 'omit', // Don't send credentials
+      mode: 'cors' // Explicitly set CORS mode
+    });
     
-//     if (!response.ok) {
-//       let errorText = "";
-//       try {
-//         errorText = await response.text();
-//       } catch (e) {
-//         errorText = `Status: ${response.status} ${response.statusText}`;
-//       }
-//       console.error(`ApiService: Video generation failed with status ${response.status}:`, errorText);
-//       throw new Error(`Failed to generate video: ${response.status} - ${errorText}`);
-//     }
+    if (!response.ok) {
+      let errorText = "";
+      try {
+        errorText = await response.text();
+      } catch (e) {
+        errorText = `Status: ${response.status} ${response.statusText}`;
+      }
+      console.error(`ApiService: Video generation failed with status ${response.status}:`, errorText);
+      throw new Error(`Failed to generate video: ${response.status} - ${errorText}`);
+    }
     
-//     const data = await response.json();
-//     console.log('ApiService: Video generated successfully', data);
-//     return data;
-//   } catch (error) {
-//     console.error('ApiService: Error generating video:', error);
+    const data = await response.json();
+    console.log('ApiService: Video generated successfully', data);
+    return data;
+  } catch (error) {
+    console.error('ApiService: Error generating video:', error);
 
-//     // Provide more detailed error information for debugging
-//     if (error.message && error.message.includes('Failed to fetch')) {
-//       console.error('ApiService: This may be a CORS error. Check the server CORS configuration and network tab.');
-//     }
-//     throw error;
-//   }
-// };
+    // Provide more detailed error information for debugging
+    if (error.message && error.message.includes('Failed to fetch')) {
+      console.error('ApiService: This may be a CORS error. Check the server CORS configuration and network tab.');
+    }
+    throw error;
+  }
+};
 
 
 // Alternative approach - Try with XMLHttpRequest instead of fetch
