@@ -2,7 +2,8 @@ import os
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from fastapi.routing import APIRoute
+
+
 
 # Import functionality from modules
 from utils import validate_api_keys
@@ -77,12 +78,25 @@ async def video_endpoint(request: VideoRequest):
 async def download_video_endpoint(filename: str):
     print(f"Request to download video file: {filename}")
     try:
+        # Get the response from the download_video function
         response = await download_video(filename)
+        
+        # Ensure CORS headers are added
+        # These should be handled by the CORS middleware, but we'll add them explicitly as well
+        # to ensure they're present in the FileResponse
+        response.headers["Access-Control-Allow-Origin"] = "*"
+        response.headers["Access-Control-Allow-Methods"] = "GET, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = "*"
+        
         print(f"Video file {filename} successfully streamed")
         return response
     except Exception as e:
         print(f"Error streaming video file {filename}: {str(e)}")
-        raise
+        # Return a properly formatted error response
+        return JSONResponse(
+            status_code=500,
+            content={"error": f"Error streaming video: {str(e)}"}
+        )
 
 if __name__ == "__main__":
     import uvicorn
