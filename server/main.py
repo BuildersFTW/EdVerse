@@ -15,7 +15,7 @@ from video import VideoRequest, generate_video, download_video
 # Initialize FastAPI app
 app = FastAPI(title="Educational Subtopics API")
 
-# Allow only the specified origin
+# Allow specified origins
 origins = [
     "https://edverse-mu.vercel.app",
     "https://edverse-server.ralgo.org"
@@ -23,7 +23,7 @@ origins = [
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins for now
+    allow_origins=origins,  # Use the specified origins list
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -34,11 +34,6 @@ app.add_middleware(
 async def add_cors_headers(request, call_next):
     try:
         response = await call_next(request)
-        if not response.headers.get("Access-Control-Allow-Origin"):
-            response.headers["Access-Control-Allow-Origin"] = "https://edverse-mu.vercel.app"
-            response.headers["Access-Control-Allow-Credentials"] = "true"
-            response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
-            response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Requested-With"
         return response
     except Exception as exc:
         # Ensure CORS headers are included even in exception responses
@@ -77,24 +72,18 @@ async def voiceover_endpoint(request: VoiceoverRequest):
 
 @app.post("/generate_video")
 async def video_endpoint(request: VideoRequest):
-    response = await generate_video(request)
-    if isinstance(response, dict):
-        return JSONResponse(
-            content=response,
-            headers={
-                "Access-Control-Allow-Origin": "https://edverse-mu.vercel.app",
-                "Access-Control-Allow-Headers": "*",
-                "Access-Control-Allow-Methods": "*"
-            }
-        )
+    try:
+        response = await generate_video(request)
+        
+        # Return a consistent JSONResponse for all cases
+        if isinstance(response, dict):
+            return JSONResponse(content=response)
+        
+        # For non-dictionary responses, convert to a standard format
+        return JSONResponse(content={"result": "success", "data": str(response)})
     
-    # Add CORS headers to non-dictionary responses
-    if hasattr(response, 'headers'):
-        response.headers["Access-Control-Allow-Origin"] = "https://edverse-mu.vercel.app"
-        response.headers["Access-Control-Allow-Headers"] = "*"
-        response.headers["Access-Control-Allow-Methods"] = "*"
-    
-    return response
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/download_video/{filename}")
@@ -103,26 +92,11 @@ async def download_video_endpoint(filename: str):
     try:
         # Get the response from the download_video function
         response = await download_video(filename)
-        
-        # Ensure CORS headers are added
-        response.headers["Access-Control-Allow-Origin"] = "https://edverse-mu.vercel.app"
-        response.headers["Access-Control-Allow-Methods"] = "GET, OPTIONS"
-        response.headers["Access-Control-Allow-Headers"] = "*"
-        
         print(f"Video file {filename} successfully streamed")
         return response
     except Exception as e:
         print(f"Error streaming video file {filename}: {str(e)}")
-        # Return a properly formatted error response
-        return JSONResponse(
-            status_code=500,
-            content={"error": f"Error streaming video: {str(e)}"},
-            headers={
-                "Access-Control-Allow-Origin": "https://edverse-mu.vercel.app",
-                "Access-Control-Allow-Methods": "GET, OPTIONS",
-                "Access-Control-Allow-Headers": "*"
-            }
-        )
+        raise HTTPException(status_code=500, detail=f"Error streaming video: {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn
