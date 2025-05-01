@@ -24,8 +24,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,  # specific allowed origin
     allow_credentials=True,
-    allow_methods=["GET", "POST", "OPTIONS"],  # Explicitly include OPTIONS for preflight
-    allow_headers=["Content-Type", "Authorization", "X-Requested-With"],
+    allow_methods=["*"],  # Explicitly include OPTIONS for preflight
+    allow_headers=["*"],
 )
 
 # Add custom middleware to ensure CORS headers are included in error responses
@@ -71,7 +71,17 @@ async def voiceover_endpoint(request: VoiceoverRequest):
 
 @app.post("/generate_video")
 async def video_endpoint(request: VideoRequest):
-    return await generate_video(request)
+    response = await generate_video(request)
+    if isinstance(response, dict):
+        return JSONResponse(
+            content=response,
+            headers={
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Headers": "*",
+                "Access-Control-Allow-Methods": "*"
+            }
+        )
+    return response
 
 
 @app.get("/download_video/{filename}")
