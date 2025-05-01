@@ -115,51 +115,94 @@ export const generateVoiceover = async (script) => {
 };
 
 // Generate video from voiceover data
-export const generateVideo = async (voiceoverData) => {
-  try {
-    console.log('ApiService: Generating video with voiceover data:', {
+export const generateVideo = generateVideoXHR;
+// export const generateVideo = async (voiceoverData) => {
+//   try {
+//     console.log('ApiService: Generating video with voiceover data:', {
+//       dataKeys: Object.keys(voiceoverData),
+//       hasTimestamps: !!voiceoverData.timestamps,
+//       timestamps_count: voiceoverData.timestamps?.length
+//     });
+
+//     // Try using a different approach for the fetch request
+//     const response = await fetch(`https://${API_BASE_URL}/generate_video`, {
+//       method: 'POST',
+//       headers: {
+//         'Content-Type': 'application/json',
+//         'Accept': 'application/json'
+//       },
+//       body: JSON.stringify({
+//         voiceover_data: voiceoverData
+//       }),
+//       credentials: 'omit', // Don't send credentials
+//       mode: 'cors' // Explicitly set CORS mode
+//     });
+    
+//     if (!response.ok) {
+//       let errorText = "";
+//       try {
+//         errorText = await response.text();
+//       } catch (e) {
+//         errorText = `Status: ${response.status} ${response.statusText}`;
+//       }
+//       console.error(`ApiService: Video generation failed with status ${response.status}:`, errorText);
+//       throw new Error(`Failed to generate video: ${response.status} - ${errorText}`);
+//     }
+    
+//     const data = await response.json();
+//     console.log('ApiService: Video generated successfully', data);
+//     return data;
+//   } catch (error) {
+//     console.error('ApiService: Error generating video:', error);
+
+//     // Provide more detailed error information for debugging
+//     if (error.message && error.message.includes('Failed to fetch')) {
+//       console.error('ApiService: This may be a CORS error. Check the server CORS configuration and network tab.');
+//     }
+//     throw error;
+//   }
+// };
+
+
+// Alternative approach - Try with XMLHttpRequest instead of fetch
+export const generateVideoXHR = async (voiceoverData) => {
+  return new Promise((resolve, reject) => {
+    console.log('ApiService: Generating video with XHR and voiceover data:', {
       dataKeys: Object.keys(voiceoverData),
       hasTimestamps: !!voiceoverData.timestamps,
       timestamps_count: voiceoverData.timestamps?.length
     });
 
-    // Try using a different approach for the fetch request
-    const response = await fetch(`https://${API_BASE_URL}/generate_video`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      },
-      body: JSON.stringify({
-        voiceover_data: voiceoverData
-      }),
-      credentials: 'omit', // Don't send credentials
-      mode: 'cors' // Explicitly set CORS mode
-    });
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', `https://${API_BASE_URL}/generate_video`, true);
+    xhr.setRequestHeader('Content-Type', 'application/json');
+    xhr.setRequestHeader('Accept', 'application/json');
+    xhr.withCredentials = false; // Don't send credentials
     
-    if (!response.ok) {
-      let errorText = "";
-      try {
-        errorText = await response.text();
-      } catch (e) {
-        errorText = `Status: ${response.status} ${response.statusText}`;
+    xhr.onload = function() {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          const data = JSON.parse(xhr.responseText);
+          console.log('ApiService: Video generated successfully', data);
+          resolve(data);
+        } catch (e) {
+          reject(new Error(`Failed to parse response: ${e.message}`));
+        }
+      } else {
+        console.error(`ApiService: Video generation failed with status ${xhr.status}:`, xhr.responseText);
+        reject(new Error(`Failed to generate video: ${xhr.status} - ${xhr.responseText}`));
       }
-      console.error(`ApiService: Video generation failed with status ${response.status}:`, errorText);
-      throw new Error(`Failed to generate video: ${response.status} - ${errorText}`);
-    }
+    };
     
-    const data = await response.json();
-    console.log('ApiService: Video generated successfully', data);
-    return data;
-  } catch (error) {
-    console.error('ApiService: Error generating video:', error);
-
-    // Provide more detailed error information for debugging
-    if (error.message && error.message.includes('Failed to fetch')) {
-      console.error('ApiService: This may be a CORS error. Check the server CORS configuration and network tab.');
-    }
-    throw error;
-  }
+    xhr.onerror = function() {
+      console.error('ApiService: Network error occurred during video generation');
+      reject(new Error('Network error occurred'));
+    };
+    
+    xhr.send(JSON.stringify({
+      voiceover_data: voiceoverData
+    }));
+  });
 };
 
 // Download a video file
