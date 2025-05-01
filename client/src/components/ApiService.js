@@ -121,10 +121,12 @@ export const generateVideo = async (voiceoverData) => {
       timestamps_count: voiceoverData.timestamps?.length
     });
 
+    // Ensure we're strictly following the same pattern as the working voiceover function
     const response = await fetch(`https://${API_BASE_URL}/generate_video`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Accept': 'application/json'
       },
       body: JSON.stringify({
         voiceover_data: voiceoverData
@@ -132,7 +134,12 @@ export const generateVideo = async (voiceoverData) => {
     });
     
     if (!response.ok) {
-      const errorText = await response.text();
+      let errorText = "";
+      try {
+        errorText = await response.text();
+      } catch (e) {
+        errorText = `Status: ${response.status} ${response.statusText}`;
+      }
       console.error(`ApiService: Video generation failed with status ${response.status}:`, errorText);
       throw new Error(`Failed to generate video: ${response.status} - ${errorText}`);
     }
@@ -142,14 +149,53 @@ export const generateVideo = async (voiceoverData) => {
     return data;
   } catch (error) {
     console.error('ApiService: Error generating video:', error);
+    // Provide more detailed error information for debugging
+    if (error.message && error.message.includes('Failed to fetch')) {
+      console.error('ApiService: This may be a CORS error. Check the server CORS configuration and network tab.');
+    }
+    throw error;
+  }
+};
+
+// Download a video file
+export const downloadVideo = async (filename) => {
+  try {
+    console.log(`ApiService: Downloading video file: ${filename}`);
+    const response = await fetch(`https://${API_BASE_URL}/download_video/${filename}`, {
+      method: 'GET',
+      headers: {
+        'Accept': 'video/mp4'
+      }
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`ApiService: Video download failed with status ${response.status}:`, errorText);
+      throw new Error(`Failed to download video: ${response.status} - ${errorText}`);
+    }
+    
+    // Return the blob for video playback
+    const blob = await response.blob();
+    return URL.createObjectURL(blob);
+  } catch (error) {
+    console.error('ApiService: Error downloading video:', error);
     throw error;
   }
 };
 
 // Get video URL for streaming
-export const getVideoUrl = (filename) => {
+export const getVideoUrl = async (filename) => {
   if (!filename) return null;
-  // Add cache busting parameter to prevent caching issues
-  return `https://${API_BASE_URL}/download_video/${filename}?t=${Date.now()}`;
+  
+  try {
+    // Instead of returning a URL to the backend, download the video first
+    // and return a blob URL that can be played locally in the browser
+    console.log(`ApiService: Creating blob URL for video: ${filename}`);
+    return await downloadVideo(filename);
+  } catch (error) {
+    console.error('ApiService: Error creating blob URL for video:', error);
+    // Return null instead of a potentially problematic direct URL
+    return null;
+  }
 };
 

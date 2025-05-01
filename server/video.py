@@ -7,6 +7,7 @@ import json
 import random
 import traceback  # Add this for detailed error tracing
 import logging  # Add logging
+import shutil  # Add this for directory operations
 from typing import List, Dict, Any, Optional
 from fastapi import HTTPException
 from pydantic import BaseModel
@@ -273,11 +274,33 @@ def get_random_music_for_fandom(fandom: str) -> str:
         logger.error(f"Error selecting background music: {str(e)}")
         return None
 
+def cleanup_temp_files(file_paths):
+    """Delete temporary files that are no longer needed"""
+    for path in file_paths:
+        try:
+            if os.path.exists(path):
+                os.remove(path)
+                logger.info(f"Deleted temporary file: {path}")
+        except Exception as e:
+            logger.warning(f"Failed to delete temporary file {path}: {str(e)}")
+
+def cleanup_temp_dir(directory):
+    """Clean up temporary directory with all its contents"""
+    try:
+        if os.path.exists(directory) and os.path.isdir(directory):
+            shutil.rmtree(directory)
+            logger.info(f"Deleted temporary directory: {directory}")
+    except Exception as e:
+        logger.warning(f"Failed to delete temporary directory {directory}: {str(e)}")
+
 async def generate_video(request: VideoRequest):
     """Generate a video based on voiceover data with stock videos and images from Pexels
     
     Returns a JSON object with video file path and information
     """
+    # List to track temporary files for cleanup
+    temp_files = []
+    
     try:
         if not request.voiceover_data or "timestamps" not in request.voiceover_data:
             logger.error("Valid voiceover data with timestamps is required")
@@ -410,6 +433,7 @@ async def generate_video(request: VideoRequest):
                     
                     # Download and load the video
                     video_path = download_media_file(video_url, "video", video_query)
+                    temp_files.append(video_path)  # Add to cleanup list
                     logger.info(f"Downloaded video to: {video_path}")
                     
                     try:
@@ -482,6 +506,8 @@ async def generate_video(request: VideoRequest):
                     # Download and load media
                     video_path = download_media_file(video_url, "video", video_query)
                     image_path = download_media_file(image_url, "image", image_query)
+                    temp_files.append(video_path)  # Add to cleanup list
+                    temp_files.append(image_path)  # Add to cleanup list
                     
                     # First 4 seconds: video
                     video_clip = VideoFileClip(video_path)
@@ -638,6 +664,7 @@ async def generate_video(request: VideoRequest):
             
             # Write video file
             temp_output_path = f"{output_path}.temp"
+            temp_files.append(temp_output_path)  # Add to cleanup list
             logger.info(f"Writing video to temporary file: {temp_output_path}")
             
             try:
@@ -669,6 +696,10 @@ async def generate_video(request: VideoRequest):
                         os.remove(output_path)
                     os.rename(temp_output_path, output_path)
                     logger.info(f"Video file renamed from {temp_output_path} to {output_path}")
+                    
+                    # Remove temp_output_path from cleanup list since it was renamed
+                    if temp_output_path in temp_files:
+                        temp_files.remove(temp_output_path)
                 else:
                     logger.error(f"Video file was not written correctly: {temp_output_path}")
                     raise Exception("Video file was not written correctly or has zero size")
@@ -714,21 +745,30 @@ async def generate_video(request: VideoRequest):
                 "concept": voiceover_data.get("educationalConcept", "")
             }
             
+            # Clean up all temporary files
+            cleanup_temp_files(temp_files)
+            
             return {
                 "video_path": output_path,
                 "video_data": response_data
             }
             
         except Exception as e:
+            # Clean up temporary files even if there's an error
+            cleanup_temp_files(temp_files)
             logger.error(f"Error generating final video: {str(e)}\n{traceback.format_exc()}")
             raise HTTPException(
                 status_code=500,
                 detail=f"Error generating final video: {str(e)}"
             )
     except HTTPException:
+        # Clean up temporary files for HTTP exceptions too
+        cleanup_temp_files(temp_files)
         # Re-raise HTTP exceptions without modification
         raise
     except Exception as e:
+        # Clean up temporary files for unexpected exceptions
+        cleanup_temp_files(temp_files)
         # Log the full error with traceback for unexpected exceptions
         logger.error(f"Unexpected error in generate_video: {str(e)}\n{traceback.format_exc()}")
         raise HTTPException(

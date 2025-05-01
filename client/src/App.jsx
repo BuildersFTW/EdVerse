@@ -28,31 +28,47 @@ function App() {
       // Get current chapter
       const currentChapter = chapters[activeChapter];
 
-      // Add a fresh timestamp to the URL to avoid caching issues
+      // Check if we already have a blob URL to use
       if (currentChapter.videoUrl) {
-        const baseUrl = currentChapter.videoUrl.split('?')[0];
-        const freshUrl = `${baseUrl}?t=${Date.now()}`;
-
+        console.log('DEBUG: Using existing blob URL for video playback');
         if (videoRef.current) {
-          // Update the src attribute with the fresh URL
-          videoRef.current.src = freshUrl;
+          // Update the src attribute with the blob URL
+          videoRef.current.src = currentChapter.videoUrl;
 
           // Load and play the video
           videoRef.current.load();
           videoRef.current.play().catch(e => {
             console.error('Error auto-playing video:', e);
-
-            // If that fails, try one more time with a fresh URL
-            const retryUrl = `${baseUrl}?t=${Date.now()}`;
-            if (videoRef.current) {
-              videoRef.current.src = retryUrl;
-              videoRef.current.load();
-              videoRef.current.play().catch(err =>
-                console.error('Final error playing video after retry:', err)
-              );
-            }
           });
         }
+      }
+      // If we don't have a URL but have a filename, download it
+      else if (currentChapter.videoFilename) {
+        console.log('DEBUG: No blob URL available, downloading video');
+        ApiService.getVideoUrl(currentChapter.videoFilename)
+          .then(blobUrl => {
+            if (blobUrl && videoRef.current) {
+              // Update the video element with the blob URL
+              videoRef.current.src = blobUrl;
+              videoRef.current.load();
+              videoRef.current.play().catch(err =>
+                console.error('Error playing video after download:', err)
+              );
+
+              // Also update the chapter data with the new URL
+              setChapters(prev => {
+                const updated = [...prev];
+                updated[activeChapter] = {
+                  ...updated[activeChapter],
+                  videoUrl: blobUrl
+                };
+                return updated;
+              });
+            }
+          })
+          .catch(error => {
+            console.error('Failed to get video URL for auto-play:', error);
+          });
       }
     }
   }, [isGenerating, activeChapter, chapters]);
@@ -364,13 +380,19 @@ function App() {
         try {
           const videoResult = await ApiService.generateVideo(voiceoverResult.voiceover_data);
 
-          const videoUrl = ApiService.getVideoUrl(videoResult.video_data.video_filename);
+          // Get a blob URL instead of a direct server URL
+          const videoUrl = await ApiService.getVideoUrl(videoResult.video_data.video_filename);
+
+          // Store the filename for backup purposes
+          const videoFilename = videoResult.video_data.video_filename;
+
           // Final result with all data
           const result = {
             script,
             voiceover: voiceoverResult,
             video: videoResult,
-            videoUrl: videoUrl
+            videoUrl: videoUrl,
+            videoFilename: videoFilename
           };
 
           // Update the chapter
@@ -380,6 +402,7 @@ function App() {
               ...updated[item.index],
               status: 'ready',
               videoUrl: result.videoUrl,
+              videoFilename: result.videoFilename,
               duration: formatDuration(result.video.video_data.duration)
             };
             return updated;
@@ -458,18 +481,25 @@ function App() {
 
       // If we have a video element reference, reset and play the new video
       if (videoRef.current) {
-        // Get fresh URL with timestamp for cache busting
         if (chapter.videoUrl) {
-          const baseUrl = chapter.videoUrl.split('?')[0];
-          const freshUrl = `${baseUrl}?t=${Date.now()}`;
-
-          // Update video src and load/play
-          videoRef.current.src = freshUrl;
+          // VideoUrl is now a blob URL so we can use it directly
+          videoRef.current.src = chapter.videoUrl;
           videoRef.current.load();
 
           // Try to play, but don't worry if it fails (user can click play)
           videoRef.current.play().catch(e => {
             console.log('User interaction may be needed to play the video:', e);
+          });
+        } else if (chapter.videoFilename) {
+          // If for some reason the videoUrl is not available, try to download it again
+          ApiService.getVideoUrl(chapter.videoFilename).then(url => {
+            if (url && videoRef.current) {
+              videoRef.current.src = url;
+              videoRef.current.load();
+              videoRef.current.play().catch(e => console.log('User interaction needed to play the video:', e));
+            }
+          }).catch(err => {
+            console.error('Failed to get video URL for chapter', err);
           });
         }
       }
@@ -540,10 +570,8 @@ function App() {
       );
     }
 
-    // Add timestamp for cache busting
-    const videoUrl = chapter.videoUrl ?
-      `${chapter.videoUrl.split('?')[0]}?t=${Date.now()}` :
-      '';
+    // No need for timestamp cache busting since we're using blob URLs now
+    const videoUrl = chapter.videoUrl || '';
 
     // Handler for video loading events
     const handleVideoLoaded = () => {
@@ -551,45 +579,103 @@ function App() {
     };
 
     // Handler for video loading errors
-    const handleVideoError = (e) => {
+    const handleVideoError = async (e) => {
       console.error('Error loading video:', e);
 
-      // If the video failed to load, we'll retry with a new URL
+      // Try downloading the video again
+      if (chapter.videoFilename) {
+        try {
+          console.log('Attempting to download video again...');
+          const blobUrl = await ApiService.downloadVideo(chapter.videoFilename);
+
+          // Update the video source with the new blob URL
+          const videoElement = e.target;
+          if (videoElement) {
+            videoElement.src = blobUrl;
+            videoElement.load();
+            videoElement.play().catch(err => console.log('User interaction needed to play video', err));
+
+            // Also update the chapter data with the new URL
+            setChapters(prev => {
+              const updated = [...prev];
+              updated[activeChapter] = {
+                ...updated[activeChapter],
+                videoUrl: blobUrl
+              };
+              return updated;
+            });
+
+            return;
+          }
+        } catch (downloadError) {
+          console.error('Failed to download video using fallback method:', downloadError);
+        }
+      }
+
+      // If the video still failed to load, show an error message
       const videoElement = e.target;
-      if (videoElement && chapter.videoUrl) {
-        console.log('Retrying video playback with fresh URL');
-
-        // Create a fresh URL with a timestamp to bypass cache
-        const freshUrl = `${chapter.videoUrl.split('?')[0]}?t=${Date.now()}`;
-
-        // Set a small timeout before retrying
-        setTimeout(() => {
-          videoElement.src = freshUrl;
-          videoElement.load();
-          videoElement.play().catch(err => console.error('Error playing video after retry:', err));
-        }, 1000);
+      if (videoElement) {
+        // Display a fallback message or image
+        setChapters(prev => {
+          const updated = [...prev];
+          if (updated[activeChapter]) {
+            updated[activeChapter].playbackError = true;
+          }
+          return updated;
+        });
       }
     };
 
     return (
       <div className="video-wrapper">
-        <video
-          ref={videoRef}
-          className="actual-video-player"
-          controls
-          autoPlay
-          preload="auto"
-          width="100%"
-          height="auto"
-          src={videoUrl}
-          poster={`https://via.placeholder.com/640x360/111827/FFFFFF?text=${encodeURIComponent(chapter.title)}`}
-          onError={handleVideoError}
-          onCanPlay={handleVideoLoaded}
-        >
-          Your browser does not support the video tag.
-        </video>
+        {chapter.playbackError ? (
+          <div className="video-error-message">
+            <h3>Video Playback Error</h3>
+            <p>There was a problem playing this video. Please try downloading the video first.</p>
+            <button
+              className="retry-download-btn"
+              onClick={async () => {
+                if (chapter.videoFilename) {
+                  try {
+                    const blobUrl = await ApiService.downloadVideo(chapter.videoFilename);
+                    setChapters(prev => {
+                      const updated = [...prev];
+                      updated[activeChapter] = {
+                        ...updated[activeChapter],
+                        videoUrl: blobUrl,
+                        playbackError: false
+                      };
+                      return updated;
+                    });
+                  } catch (error) {
+                    console.error('Failed to download video after retry:', error);
+                  }
+                }
+              }}
+            >
+              Retry Download
+            </button>
+          </div>
+        ) : (
+          <video
+            ref={videoRef}
+            className="actual-video-player"
+            controls
+            autoPlay
+            preload="auto"
+            width="100%"
+            height="auto"
+            src={videoUrl}
+            poster={`https://via.placeholder.com/640x360/111827/FFFFFF?text=${encodeURIComponent(chapter.title)}`}
+            onError={handleVideoError}
+            onCanPlay={handleVideoLoaded}
+          >
+            Your browser does not support the video tag.
+          </video>
+        )}
         <div className="video-loading-message">
-          If the video doesn't start automatically, please click the play button.
+          {!chapter.playbackError &&
+            "If the video doesn't start automatically, please click the play button."}
         </div>
       </div>
     );
