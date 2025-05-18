@@ -2,6 +2,8 @@
 
 EdVerse is an educational content generation platform that automatically creates educational videos on various topics. The application uses AI to generate educational content including subtopics, scripts, voiceovers, and finally produces complete educational videos.
 
+🚀 This project was built during the [/execute Genesis AI Hackathon](https://lablab.ai/event/execute-ai-genesis) by lablab.ai in May, 2025.
+
 ## Project Structure
 
 The project consists of two main parts:
